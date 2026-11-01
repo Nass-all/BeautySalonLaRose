@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -507,5 +507,94 @@ function deleteItem(type,id){if(!confirm('Supprimer cet élément ?'))return;db[
 try{auditBaseline=null;save();document.querySelector('.brand h1').textContent=(db.settings||{}).salon||'Beauty Salon la Rose Safou';render('dashboard');}
 catch(err){console.error('Erreur de démarrage Beauty Salon:',err);document.getElementById('main').innerHTML=`<section class="panel"><h2>Le salon n'a pas pu charger toutes les données</h2><p>Erreur : ${esc(err&&err.message?err.message:String(err))}</p><p>Notez ce message pour identifier précisément la cause.</p><button class="primary" onclick="location.reload()">Recharger l’application</button></section>`;}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  const SUPABASE_URL = "https://wtrkeukdfxviibkupihs.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_t_Qr8qgM5gqeAjNN53M1-g_xqJYmgff";
+  if (!window.supabase || !window.supabase.createClient) {
+    console.error("Supabase SDK indisponible");
+    return;
+  }
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const escOnline = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const services = ["Protéine","Filler capillaire pour cheveux","Mèches","Balayage","Manucure","Pédicure","Nettoyage de peau","Peeling","Coupe & brushing","Coloration","Autre"];
+  const css = `<style>
+  .rose-online{max-width:760px;margin:24px auto;padding:22px;background:#fff;border:1px solid #eedde4;border-radius:18px;box-shadow:0 8px 28px #7b3d5510;color:#392d33;font-family:system-ui,Arial}
+  .rose-online h1,.rose-online h2{color:#9d4f6b}.rose-online label{display:block;font-weight:600;margin:12px 0 5px}
+  .rose-online input,.rose-online select,.rose-online textarea{width:100%;padding:12px;border:1px solid #eedde4;border-radius:10px;font:inherit;background:#fff}
+  .rose-online button{padding:11px 16px;border:0;border-radius:10px;background:#9d4f6b;color:white;font-weight:700;margin:12px 6px 0 0;cursor:pointer}
+  .rose-online button.secondary{background:#eee;color:#392d33}.rose-online .msg{padding:12px;background:#f7e7ed;border-radius:10px;margin-top:12px}
+  .rose-online .item{border:1px solid #eedde4;padding:14px;border-radius:12px;margin:10px 0}.rose-online .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  @media(max-width:560px){.rose-online .grid{grid-template-columns:1fr}}
+  </style>`;
+  function showPublicBooking(){
+    document.body.innerHTML = css + `<main class="rose-online">
+      <h1>Institut de beauté Salon La Rose 🌹</h1><p>Demandez votre rendez-vous à distance. Votre demande sera confirmée par le salon après vérification des disponibilités.</p>
+      <form id="rosePublicForm">
+       <div class="grid">
+        <div><label>Nom complet *</label><input name="client_name" required maxlength="120"></div>
+        <div><label>Téléphone *</label><input name="phone" type="tel" required maxlength="40" placeholder="Votre numéro de téléphone"></div>
+        <div><label>Prestation *</label><select name="service" required>${services.map(x=>`<option value="${escOnline(x)}">${escOnline(x)}</option>`).join("")}</select></div>
+        <div><label>Date souhaitée *</label><input name="requested_date" type="date" required min="${new Date().toISOString().slice(0,10)}"></div>
+        <div><label>Heure souhaitée *</label><input name="requested_time" type="time" required></div>
+       </div>
+       <label>Message / précision (facultatif)</label><textarea name="notes" rows="3" maxlength="1000" placeholder="Précisez votre demande si nécessaire"></textarea>
+       <button type="submit">Envoyer ma demande</button>
+       <div id="rosePublicMsg" aria-live="polite"></div>
+      </form><p style="font-size:13px;color:#7c6c73">L'envoi d'une demande ne garantit pas encore le rendez-vous. Le salon vous contactera pour confirmer.</p>
+    </main>`;
+    document.getElementById("rosePublicForm").addEventListener("submit", async e=>{
+      e.preventDefault(); const form=e.currentTarget, data=Object.fromEntries(new FormData(form).entries());
+      const msg=document.getElementById("rosePublicMsg"); const btn=form.querySelector("button[type=submit]");
+      if(data.requested_date < new Date().toISOString().slice(0,10)){msg.textContent="Choisissez une date à partir d'aujourd'hui.";return;}
+      btn.disabled=true; btn.textContent="Envoi en cours…";
+      const {error}=await sb.from("reservations").insert({...data,status:"pending"});
+      btn.disabled=false; btn.textContent="Envoyer ma demande";
+      if(error){msg.className="msg";msg.textContent="Impossible d'envoyer la demande. Vérifiez votre connexion ou réessayez plus tard. ("+error.message+")";return;}
+      form.reset();msg.className="msg";msg.textContent="Votre demande a bien été envoyée ! Le Salon La Rose vous contactera pour confirmer le rendez-vous.";
+    });
+  }
+  async function renderOnlineRequests(){
+    const main=document.getElementById("main");
+    main.innerHTML=css+`<section class="rose-online"><h2>Réservations en ligne</h2><p>Connectez-vous avec le compte administrateur Supabase pour consulter et traiter les demandes des clientes.</p>
+      <form id="roseAdminLogin"><label>E-mail administrateur</label><input name="email" type="email" required autocomplete="username"><label>Mot de passe</label><input name="password" type="password" required autocomplete="current-password"><button>Se connecter</button></form><div id="roseAdminArea"></div><div id="roseAdminMsg" aria-live="polite"></div></section>`;
+    const form=document.getElementById("roseAdminLogin"), area=document.getElementById("roseAdminArea"), msg=document.getElementById("roseAdminMsg");
+    form.addEventListener("submit",async e=>{
+      e.preventDefault(); const fd=new FormData(form); msg.textContent="Connexion…";
+      const {error}=await sb.auth.signInWithPassword({email:fd.get("email"),password:fd.get("password")});
+      if(error){msg.className="msg";msg.textContent="Connexion impossible : "+error.message;return;}
+      form.style.display="none"; await loadRows();
+    });
+    async function loadRows(){
+      area.innerHTML="<p>Chargement des demandes…</p>";
+      const {data,error}=await sb.from("reservations").select("*").order("created_at",{ascending:false});
+      if(error){area.innerHTML='<div class="msg">Erreur de lecture : '+escOnline(error.message)+'</div>';return;}
+      area.innerHTML=`<button type="button" id="roseRefresh">Actualiser</button>`+(data||[]).map(r=>`<article class="item"><strong>${escOnline(r.client_name)}</strong> — ${escOnline(r.phone)}<br>Prestation : ${escOnline(r.service)}<br>Date : ${escOnline(r.requested_date)} à ${escOnline(String(r.requested_time||"").slice(0,5))}<br>Note : ${escOnline(r.notes||"—")}<br>Statut : <strong>${escOnline(r.status)}</strong><br>${r.status==="pending"?`<button data-id="${escOnline(r.id)}" data-status="confirmed">Accepter</button><button class="secondary" data-id="${escOnline(r.id)}" data-status="rejected">Refuser</button>`:""}</article>`).join("") || "<p>Aucune demande pour le moment.</p>";
+      document.getElementById("roseRefresh").onclick=loadRows;
+      area.querySelectorAll("button[data-id]").forEach(b=>b.onclick=async()=>{
+        b.disabled=true;const {error}=await sb.from("reservations").update({status:b.dataset.status}).eq("id",b.dataset.id);
+        if(error){msg.className="msg";msg.textContent="Modification impossible : "+error.message;b.disabled=false;return;}
+        await loadRows();
+      });
+    }
+  }
+  if(new URLSearchParams(location.search).get("booking")==="1"){
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",showPublicBooking);else showPublicBooking();
+    return;
+  }
+  const nav=document.getElementById("nav");
+  if(nav && !nav.querySelector('[data-page="onlineRequests"]')){
+    const b=document.createElement("button");b.dataset.page="onlineRequests";b.innerHTML='<span class="ico">☷</span>Demandes Internet';nav.appendChild(b);
+  }
+  const oldRender=window.render;
+  window.render=function(page){
+    if(page==="onlineRequests"){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));renderOnlineRequests();return;}
+    return oldRender.apply(this,arguments);
+  };
+})();
+</script>
+
+
 </body>
 </html>
